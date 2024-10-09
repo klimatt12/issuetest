@@ -1,0 +1,33 @@
+name: Check Commit Messages
+
+on: [push, pull_request]
+
+jobs:
+  commit-message-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Get issue titles
+        id: get_issues
+        run: |
+          # Fetch all issues in the repository
+          issues=$(gh issue list --json title --jq '.[].title')
+          echo "$issues" > issues.txt
+
+      - name: Check commit messages
+        run: |
+          # Get the last 10 commit messages
+          commits=$(git log --format=%s -n 10)
+
+          # Read the issue titles from the file
+          while read -r title; do
+            # Extract the prefix (e.g., "Game-")
+            prefix=$(echo "$title" | grep -oE '^[^ ]+-[0-9]+')
+            # Check if any commit starts with the prefix
+            echo "$commits" | grep -qE "^$prefix" && break
+          done < issues.txt || (echo "Commit messages must start with a valid issue title prefix." && exit 1)
